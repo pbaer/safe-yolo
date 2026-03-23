@@ -1,0 +1,108 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+    cat << 'USAGE'
+Usage: git_clone <url> [--user <user@domain.com>] [--ro <ro-pat>] [--rw <rw-pat>]
+
+  url      Plain clone URL, as shown in the ADO/GitHub clone dialog
+  --user   ADO username email (user@domain.com) (required for ADO when a PAT is provided)
+  --ro     Read-only PAT — used for cloning and fetching
+  --rw     Read/write PAT — creates ~/dev/gitx_<repo> for write operations
+
+If neither --ro nor --rw is provided, clones with the plain URL (no credentials embedded).
+Idempotent: pulls instead of cloning if the repo already exists in ~/dev.
+USAGE
+    exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+REPO_URL="$1"
+shift
+
+USER_ALIAS=""
+RO_PAT=""
+RW_PAT=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --user) USER_ALIAS="$2"; shift 2 ;;
+        --ro)   RO_PAT="$2";    shift 2 ;;
+        --rw)   RW_PAT="$2";    shift 2 ;;
+        -h|--help) usage ;;
+        *) echo "Unknown argument: $1"; usage ;;
+    esac
+done
+
+DEV_DIR="$HOME/dev"
+REPO_NAME=$(basename "${REPO_URL%%\?*}" .git)
+REPO_DIR="$DEV_DIR/$REPO_NAME"
+
+build_auth_url() {
+    local base_url="$1"
+    local pat="$2"
+    if [[ "$base_url" =~ visualstudio\.com|dev\.azure\.com ]]; then
+        if [[ -z "$USER_ALIAS" ]]; then
+            echo "Error: --user is required for ADO repos when providing a PAT" >&2
+            exit 1
+        fi
+        local encoded_user="${USER_ALIAS/@/%40}"
+        echo "$base_url" | sed "s|https://|https://${encoded_user}:${pat}@|"
+    else
+        echo "$base_url" | sed "s|https://|https://${pat}@|"
+    fi
+}
+
+CLONE_URL="$REPO_URL"
+if [[ -n "$RO_PAT" ]]; then
+    CLONE_URL=$(build_auth_url "$REPO_URL" "$RO_PAT")
+fi
+
+mkdir -p "$DEV_DIR"
+
+if [[ -d "$REPO_DIR/.git" ]]; then
+    echo "Repo already exists, pulling: $REPO_DIR"
+    git -C "$REPO_DIR" pull
+else
+    echo "Cloning into $REPO_DIR"
+    git clone "$CLONE_URL" "$REPO_DIR"
+fi
+
+if [[ -n "$RW_PAT" ]]; then
+    GITX="$DEV_DIR/gitx_$REPO_NAME"
+    RW_REMOTE=$(build_auth_url "$REPO_URL" "$RW_PAT")
+
+    rm -f "$GITX"
+    cat > "$GITX" << SCRIPT
+#!/bin/bash
+# Update RW_REMOTE when the PAT expires
+RW_REMOTE="$RW_REMOTE"
+
+REPO_NAME="\${0##*/gitx_}"
+REPO_DIR="\$(dirname "\$(realpath "\$0")")/\$REPO_NAME"
+
+CURRENT_REPO="\$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ "\$CURRENT_REPO" != "\$REPO_DIR" ]]; then
+    echo "Error: must be run from within \$REPO_DIR" >&2
+    exit 1
+fi
+
+case "\${1:-}" in
+  push)        shift; git -C "\$REPO_DIR" push "\$RW_REMOTE" "\$@" ;;
+  push-delete) shift; git -C "\$REPO_DIR" push "\$RW_REMOTE" --delete "\$@" ;;
+  push-tags)   git -C "\$REPO_DIR" push "\$RW_REMOTE" --tags ;;
+  *)
+    echo "Usage: sudo gitx_\$REPO_NAME {push|push-delete|push-tags} [args]"
+    exit 1
+    ;;
+esac
+SCRIPT
+
+    chmod +x "$GITX"
+    sudo chown root:root "$GITX"
+    sudo chmod 700 "$GITX"
+    echo "Created $GITX (root-only, requires sudo to run)"
+fi
+
+echo "Done."
