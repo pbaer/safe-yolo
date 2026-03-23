@@ -59,14 +59,14 @@ sudo mkdir -p /mnt/folderA
 sudo mount -a
 ```
 
+## Git Setup inside WSL
+
 ### Credential Isolation
 
-With interop disabled, WSL cannot invoke Windows Credential Manager, and Windows-side credentials (browser sessions, SSH keys, etc.) are not accessible from WSL. Git credentials are stored inside WSL only. Best practices:
+With interop disabled, WSL cannot invoke Windows Credential Manager, and Windows-side credentials (browser sessions, SSH keys, etc.) are not accessible from WSL. Git credentials need to be available in WSL, though, if we want to do anything with repos. We'll follow this strategy:
 
 - Clone repos with a **read-only** PAT embedded in the remote URL to limit blast radius if an agent goes rogue
-- Use a separate push URL with a read/write PAT only when needed
-
-## Git Setup inside WSL
+- Use a separate push URL with a **read/write** PAT only when needed
 
 A helper script, `git_clone` (in this repo), handles cloning and optionally setting up write access. It works for both ADO and GitHub repos.
 
@@ -76,7 +76,7 @@ Create `~/dev` and copy `git_clone` into it from Windows:
 
 ```powershell
 wsl mkdir -p ~/dev
-scp C:\path\to\git_clone wsl:~/dev/
+Get-Content -Raw C:\path\to\git_clone | wsl bash -c 'cat > ~/dev/git_clone'
 ```
 
 Or paste the contents of `git_clone` directly into `~/dev/git_clone` inside WSL. Then make it executable:

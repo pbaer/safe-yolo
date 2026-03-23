@@ -21,13 +21,13 @@ USAGE
 REPO_URL="$1"
 shift
 
-USER_ALIAS=""
+USER_EMAIL=""
 RO_PAT=""
 RW_PAT=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --user) USER_ALIAS="$2"; shift 2 ;;
+        --user) USER_EMAIL="$2"; shift 2 ;;
         --ro)   RO_PAT="$2";    shift 2 ;;
         --rw)   RW_PAT="$2";    shift 2 ;;
         -h|--help) usage ;;
@@ -42,17 +42,23 @@ REPO_DIR="$DEV_DIR/$REPO_NAME"
 build_auth_url() {
     local base_url="$1"
     local pat="$2"
+    local prefix="${base_url%%://*}://"
+    local rest="${base_url#*://}"
     if [[ "$base_url" =~ visualstudio\.com|dev\.azure\.com ]]; then
-        if [[ -z "$USER_ALIAS" ]]; then
+        if [[ -z "$USER_EMAIL" ]]; then
             echo "Error: --user is required for ADO repos when providing a PAT" >&2
             exit 1
         fi
-        local encoded_user="${USER_ALIAS/@/%40}"
-        echo "$base_url" | sed "s|https://|https://${encoded_user}:${pat}@|"
+        local encoded_user="${USER_EMAIL/@/%40}"
+        echo "${prefix}${encoded_user}:${pat}@${rest}"
     else
-        echo "$base_url" | sed "s|https://|https://${pat}@|"
+        echo "${prefix}${pat}@${rest}"
     fi
 }
+
+if [[ -n "$RW_PAT" && -z "$RO_PAT" ]]; then
+    echo "Warning: --rw provided without --ro; clone will have no credentials (will fail for private repos)" >&2
+fi
 
 CLONE_URL="$REPO_URL"
 if [[ -n "$RO_PAT" ]]; then
@@ -73,7 +79,7 @@ if [[ -n "$RW_PAT" ]]; then
     GITX="$DEV_DIR/gitx_$REPO_NAME"
     RW_REMOTE=$(build_auth_url "$REPO_URL" "$RW_PAT")
 
-    rm -f "$GITX"
+    sudo rm -f "$GITX"
     cat > "$GITX" << SCRIPT
 #!/bin/bash
 # Update RW_REMOTE when the PAT expires
