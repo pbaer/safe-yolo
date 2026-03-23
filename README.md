@@ -1,6 +1,6 @@
 # safe-yolo
 
-> **DISCLAIMER**: Follow the instructions below at your own risk! You are responsible for properly securing your agents. This is for informational purposes only: make your own judgment on whether these protections are sufficient for your use case. Feel free to suggest any improvements.
+> **DISCLAIMER**: Follow the instructions below at your own risk! You are responsible for properly securing your agents. This is for informational purposes only: make your own judgment whether these protections are sufficient for your use case. Feel free to suggest any improvements.
 
 How to somewhat safely run coding agents in YOLO mode, i.e.
 
