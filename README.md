@@ -7,9 +7,13 @@ How to somewhat safely run coding agents in YOLO mode, i.e.
 * `claude --dangerously-skip-permissions`
 * `copilot --allow-all`
 
+> **Note**: The goal here is not to set up a fully hardened sandbox that can protect against any adversarial attack. The point is to make it possible to run a coding agent in YOLO mode and have some reasonable assurance that it's not going to erase your devbox or send something embarrassing to your boss.
+
 ## Setup WSL
 
-On Windows, the basic principle is to use WSL with minimal interop to the host OS, so that an agent running inside WSL cannot use Windows credentials or resources (except for explicit, opt-in file system interop), and to protect any dangerous secrets that need to be inside WSL (e.g to allow git push to remote) to only be accessible via sudo (which the agent can't do without user intervention).
+On Windows, the basic principle is to use WSL with minimal interop to the host OS, so that an agent running inside WSL cannot use Windows credentials or resources (except for explicit, opt-in file system interop), and to protect any highly-privileged secrets that need to be inside WSL (e.g to allow git push to remote) to only be accessible via sudo (which the agent can't do without user intervention). That way, the agent can do pretty much whatever it wants inside its WSL sandbox without harming the rest of the system.
+
+Obviously, these steps imply that the agent will be running in a Linux environment, which it will tend to prefer anyway, but it means that Windows-specific development is out of scope for this strategy.
 
 > **Note:** These steps isolate the agent from Windows host resources but do not restrict outbound network access, by design; unlike our production agents, we want our dev agents to have full access to the internet. An agent running inside WSL can still make arbitrary HTTP requests, access internal network services, and reach external APIs. We protect against this with a combination of the "hard" protection of only giving the agent least-privileged access tokens, and the "soft" protection of agent instructions to ask the user before doing anything with external side effects even when in YOLO mode.
 
