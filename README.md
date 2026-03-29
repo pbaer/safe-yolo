@@ -63,7 +63,7 @@ sudo mkdir -p /mnt/folderA
 sudo mount -a
 ```
 
-> **Note**: File access inside Windows folder mounts is about 10-15x slower than the native WSL filesystem.
+> **Note**: File access inside Windows folder mounts is about 20x slower than the native WSL filesystem (even native Windows is slower than native WSL).
 
 ## Git Setup inside WSL
 
