@@ -47,13 +47,13 @@ If you need access to specific Windows folders (e.g., a shared documents folder)
 Read-only mount:
 
 ```
-C:/folderA /mnt/folderA drvfs ro,noatime,uid=1000,gid=1000 0 0
+C:/folderA /mnt/folderA drvfs ro,noatime,uid=1000,gid=1000,nofail 0 0
 ```
 
 Read-write mount (use sparingly):
 
 ```
-C:/folderB /mnt/folderB drvfs rw,noatime,uid=1000,gid=1000 0 0
+C:/folderB /mnt/folderB drvfs rw,noatime,uid=1000,gid=1000,nofail 0 0
 ```
 
 After editing `/etc/fstab`, either restart WSL (`wsl --shutdown; wsl` from PowerShell) or mount manually:
@@ -63,7 +63,7 @@ sudo mkdir -p /mnt/folderA
 sudo mount -a
 ```
 
-> **Note**: File access inside Windows folder mounts is about 20x slower than the native WSL filesystem (even native Windows is slower than native WSL).
+> **Note**: File access inside Windows folder mounts is 10-100x slower than the native WSL filesystem (even native Windows is slower than native WSL).
 
 ## Git Setup inside WSL
 
@@ -72,23 +72,22 @@ sudo mount -a
 With interop disabled, WSL cannot invoke Windows Credential Manager, and Windows-side credentials (browser sessions, SSH keys, etc.) are not accessible from WSL. Git credentials need to be available in WSL, though, if we want to do anything with repos. We'll follow this strategy:
 
 - Clone repos with a **read-only** PAT embedded in the remote URL to limit blast radius if an agent goes rogue
-- Use a separate push URL with a **read/write** PAT only when needed
+- Use a separate push URL with a **read/write** PAT (that's accessible only by root) when needed
 
 A helper script, `git_clone` (in this repo), handles cloning and optionally setting up write access. It works for both ADO and GitHub repos.
 
 ### Bootstrap
 
-Create `~/dev` and copy `git_clone` into it from Windows:
-
-```powershell
-wsl mkdir -p ~/dev
-Get-Content -Raw C:\path\to\git_clone | wsl bash -c 'cat > ~/dev/git_clone'
-```
-
-Or paste the contents of `git_clone` directly into `~/dev/git_clone` inside WSL. Then make it executable:
+Create `~/dev` and copy `git_clone` into it:
 
 ```bash
-chmod +x ~/dev/git_clone
+curl https://raw.githubusercontent.com/pbaer/safe-yolo/refs/heads/main/git_clone > git_clone
+```
+
+Then make it executable:
+
+```bash
+chmod +x git_clone
 ```
 
 ### Cloning Repos
@@ -97,13 +96,13 @@ Pass the plain clone URL as shown in the ADO or GitHub clone dialog:
 
 ```bash
 # ADO repo
-~/dev/git_clone "https://<org>.visualstudio.com/<project>/_git/<repo>" --user <user@domain.com> --ro <RO_PAT> --rw <RW_PAT>
+./git_clone https://<org>.visualstudio.com/<project>/_git/<repo> --user <user@domain.com> --ro <RO_PAT> --rw <RW_PAT>
 
 # GitHub repo
-~/dev/git_clone "https://github.com/<org>/<repo>.git" --ro <RO_PAT> --rw <RW_PAT>
+./git_clone https://github.com/<org>/<repo>.git --ro <RO_PAT> --rw <RW_PAT>
 
 # No PAT (plain clone, e.g. public repo)
-~/dev/git_clone "https://github.com/<org>/<repo>.git"
+./git_clone https://github.com/<org>/<repo>.git
 ```
 
 `--user` is the ADO username email (user@domain.com). It is required for ADO repos when a PAT is provided. Omit `--rw` to skip creating the `gitx_<repo>` write script.
